@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Weather Maps</title>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <link href="https://fonts.googleapis.com/css?family=Titillium+Web" rel="stylesheet">
+    <style>
+      /* Always set the map height explicitly to define the size of the div
+       * element that contains the map. */
+        * {
+            //text-align: center;
+            color:white;
+            font-family: 'Titillium Web', sans-serif;
+        }
+      
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+        
+        body, html {
+            height:100%;
+            position:fixed;
+            left:0;
+            right:0;
+            top:0;
+            z-index: -1;
+            // background-image: url('sunny1.jpg');
+            transition: background-image 0.7s ease-in-out;
+            
+            height:100%;
+            
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: cover;
+        }
+        #content {
+            position: absolute;
+            left: 1%;
+            right: 68%;
+            height: 90%;
+            margin: 0 auto;
+            margin-top: 2%;
+            top:0%;
+            font-size:1.6em;
+            text-align: left;
+            background: rgba(125,125,125,0.7);
+        }
+        #map {
+          top:0;
+            left:0;
+            right:0;
+            bottom:0;
+          height: 90%;
+          margin: 0 auto;
+          margin-top: 2%;
+          width: 65%;
+          left: 16%;
+      }
+        p, h1, h2 {
+            padding: 3%;
+            padding-top: 0%;
+            padding-bottom: 0%;
+        }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+      <div class="bg" id="bg"></div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+    <script>
+        "use strict";
+        var globalMarker;
+        
+      function initMap() {
+        var myLatlng = {lat: 43.1566, lng: -77.6088};
+
+        var map = new google.maps.Map(document.getElementById('map'), {
+          zoom: 4,
+          //defaultCenter: myLatlng
+          center: myLatlng
+        });
+
+        var marker = new google.maps.Marker({
+          position: myLatlng,
+          map: map,
+          icon: 'cloud2.png'
+        });
+          
+          globalMarker = marker;
+
+        /*map.addListener('center_changed', function() {
+          // 3 seconds after the center of the map has changed, pan back to the
+          // marker.
+          window.setTimeout(function() {
+            map.panTo(marker.getPosition());
+          }, 3000);
+        });*/
+
+          map.addListener('click', function(e) {
+              marker.setMap(null);
+              marker = new google.maps.Marker({position: e.latLng, map: map, icon: 'cloud2.png'});
+              var position = marker.getPosition();
+              var lat = position.lat();
+              var lon = position.lng();
+              getWeather(lat, lon);
+          });          
+          
+          marker.setMap(null);
+          marker = new google.maps.Marker({position: {lat: 43.1566, lng: -77.6088}, map: map, icon: 'cloud2.png'});
+          var position = marker.getPosition();
+          var lat = position.lat();
+          var lon = position.lng();
+          getWeather(lat, lon);
+          
+          // get the first weather if geolocation is on
+          navigator.geolocation.getCurrentPosition(function(position) {
+              console.log("yay");
+          });
+      }
+        function geolocation(position) {
+            console.log("setting weather based on geolocation");
+            var latitude = position.coords.latitude;
+            var longitude = position.coords.longitude;
+            var latLng = {lat:latitude , lng:longitude}
+            // was called from navigator's coords
+            globalMarker.setMap(null);
+            globalMarker = new google.maps.Marker({position: latLng, map: map, icon: 'cloud2.png'});
+            getWeather(latitude, longitude);
+        }
+        
+        function loadWeather(lat, long) {
+            var xhr = new XMLHttpRequest();
+            xhr.onload = function() {
+                // read in JSON
+                var JSON = JSON.parse( xhr.responseText );
+                var currentTemp = JSON.currently.temperature || "no temp";
+                console.log(currentTemp);
+            }
+            var url = "https://api.darksky.net/forecast/4826106e3c1de8596a8ba42252c70372/" + lat + "," + long;
+            xhr.open('GET',url,true);
+            xhr.setRequestHeader("If-Modified-Since", "Sat, 1 Jan 2010 00:00:00 GMT");
+            xhr.setRequestHeader("Access-Control-Allow-Origin", "https://people.rit.edu");
+            xhr.setRequestHeader("Access-Control-Allow-Origin", "*");
+            xhr.send();
+        }
+        
+        function getWeather(lat, long) {
+            // build up our URL string
+            var url = "https://api.darksky.net/forecast/4826106e3c1de8596a8ba42252c70372/" + lat + "," + long;
+            
+            document.querySelector("#content").innerHTML = "<b></b>";
+
+            // call the web service, and download the file
+            $("#content").fadeOut(100);
+            $.ajax({
+                dataType: "jsonp",
+                url: url,
+                data: null,
+                success: jsonLoaded
+            });
+            
+            // call loadData()
+        }
+        
+        function jsonLoaded(obj){
+            // console.log("obj stringified = " + JSON.stringify(obj));
+            
+            var temp = Math.trunc(obj.currently.temperature);
+            var high = Math.trunc(obj.daily.data[0].temperatureHigh);
+            var summary = obj.daily.data[0].summary;
+            var humidity = Math.trunc(obj.currently.humidity *= 100);
+            var uvIndex = obj.currently.uvIndex;
+            var chanceRain = rainChance(obj);
+            chanceRain = Math.trunc(chanceRain *= 100);
+            setBackground(obj, summary);
+            
+            var section = document.createElement('section');
+            
+            var tempHTML = document.createElement('h1');
+            tempHTML.textContent = "Current Temperature: " + temp + "°F";
+            section.appendChild(tempHTML);
+            
+            var dailyHigh = document.createElement('h2');
+            dailyHigh.textContent = "Daily High: " + high + "°F";
+            section.appendChild(dailyHigh);
+            
+            var summaryHTML = document.createElement('p');
+            summaryHTML.textContent = summary;
+            section.appendChild(summaryHTML);
+            
+            var humidityHTML = document.createElement('p');
+            humidityHTML.textContent = "humidity: " + humidity + "%";
+            section.appendChild(humidityHTML);
+            
+            var uvIndexHTML = document.createElement('p');
+            uvIndexHTML.textContent = "UV Index: " + uvIndex;
+            section.appendChild(uvIndexHTML);
+            
+            var rainHTML = document.createElement('p');
+            rainHTML.textContent = chanceRain + "% " + "chance of rain in the next 24 hours";
+            section.appendChild(rainHTML);
+            
+            var content = document.querySelector('#content');
+            content.innerHTML = "";
+            content.appendChild(section);
+            
+            $("#content").fadeIn(800);
+        }
+        
+        function rainChance(obj) {
+            var chance = 0;
+            for(var i = 0; i < 24; i++) {
+                if(obj.hourly.data[i].precipProbability > chance)
+                    chance = obj.hourly.data[i].precipProbability;
+            }
+            return chance;
+        }
+        
+        function setBackground(obj, desc) {
+            // make description lowercase so we can compare it to lowercase letters
+            desc = desc.toLowerCase();
+            
+            // background-image: url('sunny1.jpg');
+            
+            
+            if(desc.search('foggy') != -1) {
+                document.body.style.backgroundImage = "url('foggy1.jpg')";
+            }
+            else if(desc.search('partly cloudy') != -1) {
+                document.body.style.backgroundImage = "url('partlyCloud.png')";
+            }
+            else if(desc.search('cloudy') != -1 || desc.search('overcast') != -1) {
+                document.body.style.backgroundImage = "url('overcast1.jpg')";
+            }
+            else if(desc.search('rain') != -1) {
+                document.body.style.backgroundImage = "url('rain2.jpg')";
+            }
+            else if(desc.search('snow') != -1) {
+                document.body.style.backgroundImage = "url('snow1.jpg')";
+            }
+            else {
+                document.body.style.backgroundImage = "url('sunny3.jpg')";
+            }
+        }
+    </script>
+    <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBwm_l0A0ncPdxMHrCr4N0g8K_jKYNTQ40&callback=initMap">
+    </script>
+      <div id='content'></div>
+  </body>
+</html>
